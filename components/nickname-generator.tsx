@@ -222,7 +222,7 @@ export default function NicknameGenerator(): React.ReactElement {
                                         <button
                                             key={name}
                                             onClick={() => setInput(name)}
-                                            className={`px-3 py-1 text-sm bg-linear-to-br from-purple-100 to-blue-100 text-purple-700 rounded-full hover:from-purple-200 hover:to-blue-200 transition-all font-medium ${fontFamilyMap[fontType]}`}
+                                            className={`px-3 py-1 text-sm bg-linear-to-br from-purple-100 to-blue-100 text-purple-700 rounded-full hover:from-purple-200 hover:to-blue-200 transition-all font-medium cursor-pointer`}
                                         >
                                             {name}
                                         </button>
