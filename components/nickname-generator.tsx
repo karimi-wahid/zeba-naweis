@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Copy, Download, Sparkles, Heart, RotateCcw, Zap } from 'lucide-react';
+import { Copy, Download, Sparkles, Heart, RotateCcw, Zap, Clock, Undo2, Redo2 } from 'lucide-react';
 import NicknamePreview from './nickname-preview';
 import SymbolShowcase from './symbol-showcase';
 import FavoritesList from './favorites-list';
+import HistoryPanel from './history-panel';
+import ThemeToggle from './theme-toggle';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 
 type SymbolKeys = 'stars' | 'brackets' | 'hearts' | 'arrows' | 'decorative' | 'none';
 type StyleKeys = 'fancy' | 'symbols' | 'mono' | 'spaced' | 'smallcaps' | 'none';
@@ -16,6 +19,15 @@ interface Nickname {
     timestamp: number;
 }
 
+interface StateSnapshot {
+    input: string;
+    symbolSet: SymbolKeys;
+    styleType: StyleKeys;
+    fontType: FontKeys;
+    count: number;
+    results: string[];
+}
+
 export default function NicknameGenerator(): React.ReactElement {
     const [input, setInput] = useState<string>('');
     const [results, setResults] = useState<string[]>([]);
@@ -24,8 +36,11 @@ export default function NicknameGenerator(): React.ReactElement {
     const [fontType, setFontType] = useState<FontKeys>('vazirmatn');
     const [count, setCount] = useState<number>(6);
     const [favorites, setFavorites] = useState<Nickname[]>([]);
+    const [history, setHistory] = useState<Nickname[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'generate' | 'favorites'>('generate');
+    const [activeTab, setActiveTab] = useState<'generate' | 'favorites' | 'history'>('generate');
+    const [undoStack, setUndoStack] = useState<StateSnapshot[]>([]);
+    const [redoStack, setRedoStack] = useState<StateSnapshot[]>([]);
 
     const symbols: Record<SymbolKeys, string[]> = {
         stars: ['✦', '✧', '✩', '★', '☆', '⭐', '✪', '✫', '✬', '✭', '✮', '✯', '💫', '⋆', '✳', '✲', '❋', '❂', '❃', '❉'],
@@ -120,6 +135,40 @@ export default function NicknameGenerator(): React.ReactElement {
         return text.split('').map(ch => map[ch.toLowerCase()] || ch).join('');
     }
 
+    function saveStateToStack(): void {
+        const snapshot: StateSnapshot = { input, symbolSet, styleType, fontType, count, results };
+        setUndoStack(prev => [...prev.slice(-19), snapshot]);
+        setRedoStack([]);
+    }
+
+    function undo(): void {
+        if (undoStack.length === 0) return;
+        const currentState: StateSnapshot = { input, symbolSet, styleType, fontType, count, results };
+        const previousState = undoStack[undoStack.length - 1];
+        setRedoStack(prev => [...prev, currentState]);
+        setUndoStack(prev => prev.slice(0, -1));
+        setInput(previousState.input);
+        setSymbolSet(previousState.symbolSet);
+        setStyleType(previousState.styleType);
+        setFontType(previousState.fontType);
+        setCount(previousState.count);
+        setResults(previousState.results);
+    }
+
+    function redo(): void {
+        if (redoStack.length === 0) return;
+        const currentState: StateSnapshot = { input, symbolSet, styleType, fontType, count, results };
+        const nextState = redoStack[redoStack.length - 1];
+        setUndoStack(prev => [...prev, currentState]);
+        setRedoStack(prev => prev.slice(0, -1));
+        setInput(nextState.input);
+        setSymbolSet(nextState.symbolSet);
+        setStyleType(nextState.styleType);
+        setFontType(nextState.fontType);
+        setCount(nextState.count);
+        setResults(nextState.results);
+    }
+
     function generateOnce(base: string): string {
         if (!base || base.trim() === '') return '';
         let s = base.trim();
@@ -132,6 +181,7 @@ export default function NicknameGenerator(): React.ReactElement {
     }
 
     function generateMany(): void {
+        saveStateToStack();
         const base = input || 'نام-برگزیده';
         const out: string[] = [];
         for (let i = 0; i < count; i++) {
@@ -145,6 +195,15 @@ export default function NicknameGenerator(): React.ReactElement {
             else out.push(g + Math.floor(Math.random() * 9));
         }
         setResults(out);
+
+        out.forEach(nickname => {
+            const historyItem: Nickname = {
+                id: `hist-${Date.now()}-${Math.random()}`,
+                text: nickname,
+                timestamp: Date.now()
+            };
+            setHistory(prev => [historyItem, ...prev.slice(0, 49)]);
+        });
     }
 
     function copyToClipboard(text: string, id: string): void {
@@ -152,6 +211,11 @@ export default function NicknameGenerator(): React.ReactElement {
             setCopiedId(id);
             setTimeout(() => setCopiedId(null), 2000);
         });
+    }
+
+    function copyAll(): void {
+        const text = results.join('\n');
+        copyToClipboard(text, 'all');
     }
 
     function addToFavorites(text: string): void {
@@ -169,6 +233,14 @@ export default function NicknameGenerator(): React.ReactElement {
         setFavorites(favorites.filter(f => f.id !== id));
     }
 
+    function removeHistoryItem(id: string): void {
+        setHistory(history.filter(h => h.id !== id));
+    }
+
+    function clearHistory(): void {
+        setHistory([]);
+    }
+
     function downloadTxt(): void {
         const content = results.join('\n');
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -180,40 +252,71 @@ export default function NicknameGenerator(): React.ReactElement {
         URL.revokeObjectURL(url);
     }
 
-    const sampleNames = ['پشتکار', 'قهرمان', 'ستاره', 'جادوگر', 'سایه', 'ابر', 'فلش', 'آذر', 'سروش'];
+    const sampleNames = ['مسعود', 'عزیز', 'عابد', 'خالد', 'حامد', 'ذاهد', 'فهیم', 'صمیم', 'تمیم'];
+
+    useKeyboardShortcuts({
+        onGenerate: generateMany,
+        onUndo: undo,
+        onRedo: redo,
+        onCopyAll: copyAll,
+    });
 
     return (
-        <div className="min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-cyan-50 p-4 md:p-8">
+        <div className="min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900 p-4 md:p-8 transition-colors">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                        <Sparkles className="w-8 h-8 text-purple-600" />
-                        <h1 className="text-4xl md:text-5xl font-bold bg-linear-to-br from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                            نام‌سازِ جادویی
-                        </h1>
-                        <Sparkles className="w-8 h-8 text-cyan-600" />
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={undo}
+                            disabled={undoStack.length === 0}
+                            className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            title="برگشت (Ctrl+Z)"
+                        >
+                            <Undo2 className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={redo}
+                            disabled={redoStack.length === 0}
+                            className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            title="جلو (Ctrl+Y)"
+                        >
+                            <Redo2 className="w-5 h-5" />
+                        </button>
                     </div>
-                    <p className="text-gray-600 text-lg">تولید نام‌های کاربری با سبک‌های منحصرِ به فرد</p>
+                    <div className="text-center flex-1">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                            <Sparkles className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                            <h1 className="text-4xl md:text-5xl font-bold bg-linear-to-r from-purple-600 via-blue-600 to-cyan-600 dark:from-purple-400 dark:via-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                                نام‌سازِ جادویی
+                            </h1>
+                            <Sparkles className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 text-lg">تولید نام‌های کاربری با سبک‌های منحصرِ فرد</p>
+                    </div>
+                    <div className="flex justify-end">
+                        <ThemeToggle />
+                    </div>
                 </div>
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     {/* Input & Controls */}
                     <div className="lg:col-span-2">
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/40">
+                        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/40 dark:border-gray-700/40">
                             <div className="space-y-4">
                                 {/* Input */}
                                 <div>
-                                    <label className={`block text-sm font-semibold text-gray-700 mb-2 ${fontFamilyMap[fontType]}`}>
-                                        نام پایه (فارسی یا لاتین)
+                                    <label className={`block text-sm font-semibold text-right text-gray-700 dark:text-gray-300 mb-2`}>
+                                        نام پایه (فارسی)
                                     </label>
                                     <input
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
-                                        placeholder="مثلاً: وحید، علی، یا تصادفی..."
-                                        className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all text-right ${fontFamilyMap[fontType]}`}
+                                        placeholder="مثلاً: وحید، علی..."
+                                        className={`w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 outline-none transition-all text-right ${fontFamilyMap[fontType]}`}
                                     />
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">Ctrl+Enter برای تولید سریع</p>
                                 </div>
 
                                 {/* Quick Random */}
@@ -222,7 +325,7 @@ export default function NicknameGenerator(): React.ReactElement {
                                         <button
                                             key={name}
                                             onClick={() => setInput(name)}
-                                            className={`px-3 py-1 text-sm bg-linear-to-br from-purple-100 to-blue-100 text-purple-700 rounded-full hover:from-purple-200 hover:to-blue-200 transition-all font-medium cursor-pointer`}
+                                            className={`px-3 py-1 text-sm bg-linear-to-r from-purple-100 to-blue-100 dark:from-purple-900 dark:to-blue-900 text-purple-700 dark:text-purple-300 rounded-full hover:from-purple-200 hover:to-blue-200 dark:hover:from-purple-800 dark:hover:to-blue-800 transition-all font-medium`}
                                         >
                                             {name}
                                         </button>
@@ -230,14 +333,14 @@ export default function NicknameGenerator(): React.ReactElement {
                                 </div>
 
                                 {/* Controls Grid */}
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-3 text-right">
                                     {/* Symbol Dropdown */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">نماد</label>
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">نماد</label>
                                         <select
                                             value={symbolSet}
                                             onChange={(e) => setSymbolSet(e.target.value as SymbolKeys)}
-                                            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
+                                            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:border-purple-500 outline-none text-sm"
                                         >
                                             <option value="none" disabled>انتخاب کن</option>
                                             <option value="stars">ستاره ✦</option>
@@ -251,29 +354,28 @@ export default function NicknameGenerator(): React.ReactElement {
 
                                     {/* Style Dropdown */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">سبک</label>
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">سبک</label>
                                         <select
                                             value={styleType}
                                             onChange={(e) => setStyleType(e.target.value as StyleKeys)}
-                                            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
+                                            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:border-purple-500 outline-none text-sm"
                                         >
                                             <option value="none" disabled>انتخاب کن</option>
                                             <option value="fancy">فانتزی</option>
                                             <option value="symbols">نمادی</option>
                                             <option value="mono">تک‌حروف</option>
                                             <option value="spaced">فاصله‌دار</option>
-                                            <option value="smallcaps">Small Caps</option>
                                             <option value="none">بدون</option>
                                         </select>
                                     </div>
 
                                     {/* Font Dropdown */}
                                     <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">فونت</label>
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">فونت</label>
                                         <select
                                             value={fontType}
                                             onChange={(e) => setFontType(e.target.value as FontKeys)}
-                                            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
+                                            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:border-purple-500 outline-none text-sm"
                                         >
                                             <option value="vazirmatn" disabled>انتخاب کن</option>
                                             <option value="vazirmatn">وزیرمتن</option>
@@ -301,14 +403,14 @@ export default function NicknameGenerator(): React.ReactElement {
 
                                     {/* Count Control */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">تعداد</label>
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">تعداد</label>
                                         <input
                                             type="number"
                                             value={count}
                                             min={1}
                                             max={20}
                                             onChange={(e) => setCount(Number(e.target.value))}
-                                            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none"
+                                            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:border-purple-500 outline-none"
                                         />
                                     </div>
                                 </div>
@@ -317,14 +419,14 @@ export default function NicknameGenerator(): React.ReactElement {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={generateMany}
-                                        className="flex-1 px-4 py-3 bg-linear-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                                        className="flex-1 px-4 py-3 bg-linear-to-r from-purple-600 to-blue-600 dark:from-purple-700 dark:to-blue-700 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 dark:hover:from-purple-600 dark:hover:to-blue-600 transition-all shadow-lg flex items-center justify-center gap-2"
                                     >
                                         <Zap className="w-5 h-5" />
                                         تولید کن
                                     </button>
                                     <button
                                         onClick={() => setInput('')}
-                                        className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+                                        className="px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
                                     >
                                         <RotateCcw className="w-5 h-5" />
                                     </button>
@@ -337,28 +439,38 @@ export default function NicknameGenerator(): React.ReactElement {
                     <SymbolShowcase symbols={symbols} />
                 </div>
 
-                {/* Results & Favorites Tabs */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-white/40">
+                {/* Results & Favorites & History Tabs */}
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-white/40 dark:border-gray-700/40 ">
                     {/* Tab Navigation */}
-                    <div className="flex border-b border-gray-200">
+                    <div className="flex border-b border-gray-200 dark:border-gray-700 flex-wrap flex-row-reverse">
                         <button
                             onClick={() => setActiveTab('generate')}
-                            className={`flex-1 px-6 py-4 font-semibold transition-all ${activeTab === 'generate'
-                                ? 'bg-linear-to-br from-purple-100 to-blue-100 text-purple-700 border-b-2 border-purple-600'
-                                : 'text-gray-600 hover:text-gray-800'
+                            className={`px-6 py-4 font-semibold transition-all ${activeTab === 'generate'
+                                ? 'bg-linear-to-r from-purple-100 to-blue-100 dark:from-purple-900 dark:to-blue-900 text-purple-700 dark:text-purple-300 border-b-2 border-purple-600'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'
                                 }`}
                         >
                             نتایج تولیدی
                         </button>
                         <button
                             onClick={() => setActiveTab('favorites')}
-                            className={`flex-1 px-6 py-4 font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites'
-                                ? 'bg-linear-to-br from-blue-100 to-cyan-100 text-blue-700 border-b-2 border-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
+                            className={`px-6 py-4 font-semibold transition-all flex items-center gap-2 ${activeTab === 'favorites'
+                                ? 'bg-linear-to-r from-blue-100 to-cyan-100 dark:from-blue-900 dark:to-cyan-900 text-blue-700 dark:text-blue-300 border-b-2 border-blue-600'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'
                                 }`}
                         >
                             <Heart className="w-5 h-5" />
                             علاقه‌مندی‌ها
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`px-6 py-4 font-semibold transition-all flex items-center gap-2 ${activeTab === 'history'
+                                ? 'bg-linear-to-r from-green-100 to-emerald-100 dark:from-green-900 dark:to-emerald-900 text-green-700 dark:text-green-300 border-b-2 border-green-600'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'
+                                }`}
+                        >
+                            <Clock className="w-5 h-5" />
+                            هیستوری
                         </button>
                     </div>
 
@@ -375,20 +487,18 @@ export default function NicknameGenerator(): React.ReactElement {
                                             onAddFavorite={addToFavorites}
                                             fontClass={fontFamilyMap[fontType]}
                                         />
-                                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                                             <button
-                                                onClick={() => {
-                                                    const text = results.join('\n');
-                                                    copyToClipboard(text, 'all');
-                                                }}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all"
+                                                onClick={copyAll}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-xl font-semibold hover:bg-blue-700 dark:hover:bg-blue-600 transition-all"
+                                                title="Ctrl+Shift+C"
                                             >
                                                 <Copy className="w-5 h-5" />
                                                 کپی همه
                                             </button>
                                             <button
                                                 onClick={downloadTxt}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 text-white rounded-xl font-semibold hover:bg-cyan-700 transition-all"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 dark:bg-cyan-700 text-white rounded-xl font-semibold hover:bg-cyan-700 dark:hover:bg-cyan-600 transition-all"
                                             >
                                                 <Download className="w-5 h-5" />
                                                 دانلود
@@ -397,17 +507,26 @@ export default function NicknameGenerator(): React.ReactElement {
                                     </>
                                 ) : (
                                     <div className="text-center py-12">
-                                        <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500 text-lg">نام خود را وارد کنید و کلیک کنید</p>
+                                        <Sparkles className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                                        <p className="text-gray-500 dark:text-gray-400 text-lg">نام خود را وارد کنید و کلیک کنید</p>
                                     </div>
                                 )}
                             </>
-                        ) : (
+                        ) : activeTab === 'favorites' ? (
                             <FavoritesList
                                 favorites={favorites}
                                 copiedId={copiedId}
                                 onCopy={copyToClipboard}
                                 onRemove={removeFavorite}
+                                fontClass={fontFamilyMap[fontType]}
+                            />
+                        ) : (
+                            <HistoryPanel
+                                history={history}
+                                copiedId={copiedId}
+                                onCopy={copyToClipboard}
+                                onClear={clearHistory}
+                                onRemoveItem={removeHistoryItem}
                                 fontClass={fontFamilyMap[fontType]}
                             />
                         )}

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Copy, Heart } from 'lucide-react';
 
 interface NicknamePreviewProps {

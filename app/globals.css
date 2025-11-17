@@ -1,67 +1,124 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.98 0.01 270);
+  --foreground: oklch(0.15 0.05 270);
+  --primary: oklch(0.55 0.2 260);
+  --primary-foreground: oklch(0.98 0.01 270);
+  --secondary: oklch(0.65 0.15 200);
+  --secondary-foreground: oklch(0.15 0.05 270);
+  --accent: oklch(0.6 0.18 280);
+  --accent-foreground: oklch(0.98 0.01 270);
+  --border: oklch(0.92 0.02 260);
+  --input: oklch(0.95 0.01 270);
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: oklch(0.12 0.01 260);
+  --foreground: oklch(0.95 0.02 270);
+  --primary: oklch(0.65 0.18 280);
+  --primary-foreground: oklch(0.12 0.01 260);
+  --secondary: oklch(0.5 0.15 200);
+  --secondary-foreground: oklch(0.95 0.02 270);
+  --accent: oklch(0.7 0.18 220);
+  --accent-foreground: oklch(0.12 0.01 260);
+  --border: oklch(0.28 0.02 260);
+  --input: oklch(0.22 0.02 260);
+}
+
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
-/* Font utility classes for easy application */
+/* Persian fonts utility classes */
 .font-vazirmatn {
-  font-family: var(--font-vazirmatn);
+  font-family: "Vazirmatn", sans-serif;
+}
+.font-sahel {
+  font-family: "Sahel", sans-serif;
+}
+.font-samim {
+  font-family: "Samim", sans-serif;
 }
 .font-lalezar {
-  font-family: var(--font-lalezar);
+  font-family: "Lalezar", sans-serif;
 }
-.font-bahij {
-  font-family: var(--font-bahij);
+.font-tanha {
+  font-family: "Tanha", sans-serif;
 }
-.font-ibm-plex {
-  font-family: var(--font-ibm-plex);
+.font-shabnam {
+  font-family: "Shabnam", sans-serif;
 }
-.font-droid-arabic {
-  font-family: var(--font-droid-arabic);
+.font-yekan-bakh {
+  font-family: "Yekan Bakh", sans-serif;
 }
-.font-cairo {
-  font-family: var(--font-cairo);
+.font-iran-sans {
+  font-family: "Iran Sans", sans-serif;
 }
-.font-almarai {
-  font-family: var(--font-almarai);
+.font-iran-nastaliq {
+  font-family: "Iran Nastaliq", sans-serif;
 }
-.font-alexandria {
-  font-family: var(--font-alexandria);
+.font-mitra {
+  font-family: "Mitra", sans-serif;
 }
-.font-amiri {
-  font-family: var(--font-amiri);
+.font-titr {
+  font-family: "Titr", sans-serif;
 }
-.font-aleo {
-  font-family: var(--font-aleo);
+.font-roya {
+  font-family: "Roya", sans-serif;
 }
-.font-anton {
-  font-family: var(--font-anton);
+.font-traffic {
+  font-family: "Traffic", sans-serif;
 }
-.font-inconsolata {
-  font-family: var(--font-inconsolata);
+.font-nassim {
+  font-family: "Nassim", sans-serif;
 }
-.font-jetbrains {
-  font-family: var(--font-jetbrains);
+.font-byekan {
+  font-family: "Byekan", sans-serif;
 }
-.font-playfair {
-  font-family: var(--font-playfair);
+.font-parastoo {
+  font-family: "Parastoo", sans-serif;
 }
-.font-merriweather {
-  font-family: var(--font-merriweather);
+.font-davat {
+  font-family: "Davat", sans-serif;
 }
-.font-lora {
-  font-family: var(--font-lora);
+.font-koodak {
+  font-family: "Koodak", sans-serif;
 }
-.font-roboto {
-  font-family: var(--font-roboto);
+.font-zar {
+  font-family: "Zar", sans-serif;
 }
-.font-opensans {
-  font-family: var(--font-opensans);
-}
-.font-ubuntu {
-  font-family: var(--font-ubuntu);
-}
-.font-source-serif {
-  font-family: var(--font-source-serif);
+.font-homa {
+  font-family: "Homa", sans-serif;
 }
